@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { minioClient, MINIO_BUCKET, ensureBucketExists } from '../config/minio';
 import { esClient } from '../config/elasticsearch';
 import { parsePdf } from '../services/pdf-parser.service';
+import { geocodeCity } from '../services/geocoding.service';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -49,6 +50,15 @@ export async function indexDocument(req: AuthRequest, res: Response, next: NextF
       return;
     }
 
+    // Geocode city → lat/lon if not already provided
+    let resolvedLocation = location ?? null;
+    if (!resolvedLocation && city) {
+      resolvedLocation = await geocodeCity(city);
+      if (resolvedLocation) {
+        logger.info(`Geocoded "${city}" → ${resolvedLocation.lat}, ${resolvedLocation.lon}`);
+      }
+    }
+
     const doc = {
       forensic_analyst_name: forensicAnalystName,
       organization_name: organizationName,
@@ -58,7 +68,7 @@ export async function indexDocument(req: AuthRequest, res: Response, next: NextF
       sample_hash: sampleHash,
       pdf_content: pdfContent,
       city: city || null,
-      location: location || null,
+      location: resolvedLocation,
       minio_object_key: objectKey,
       indexed_at: new Date().toISOString(),
     };

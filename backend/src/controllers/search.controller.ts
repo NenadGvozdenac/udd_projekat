@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { esClient } from '../config/elasticsearch';
 import { parseBooleanQuery } from '../services/boolean-query.service';
+import { geocodeCity } from '../services/geocoding.service';
 
 const INDEX = 'forensic_reports';
 const HIGHLIGHT_FIELDS = {
@@ -118,10 +119,20 @@ export async function booleanSearch(req: AuthRequest, res: Response, next: NextF
 
 export async function geoSearch(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { lat, lon, distance = '50km', page = '1', size = '10' } = req.query;
+    const { lat, lon, city, distance = '50km', page = '1', size = '10' } = req.query;
 
-    if (!lat || !lon) {
-      res.status(400).json({ error: 'lat and lon are required' });
+    let geoPoint: { lat: number; lon: number } | null = null;
+
+    if (lat && lon) {
+      geoPoint = { lat: Number(lat), lon: Number(lon) };
+    } else if (city) {
+      geoPoint = await geocodeCity(city as string);
+      if (!geoPoint) {
+        res.status(400).json({ error: `Could not geocode city: "${city}"` });
+        return;
+      }
+    } else {
+      res.status(400).json({ error: 'Provide lat+lon or city' });
       return;
     }
 
@@ -134,13 +145,13 @@ export async function geoSearch(req: AuthRequest, res: Response, next: NextFunct
       query: {
         geo_distance: {
           distance: distance as string,
-          location: { lat: Number(lat), lon: Number(lon) },
+          location: geoPoint,
         },
       },
       highlight: { fields: HIGHLIGHT_FIELDS },
     });
 
-    res.json(formatResults(result));
+    res.json({ ...formatResults(result), geoPoint });
   } catch (err) {
     next(err);
   }

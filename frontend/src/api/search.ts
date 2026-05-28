@@ -21,7 +21,7 @@ export async function booleanSearch(params: BooleanSearchParams): Promise<Search
   return data;
 }
 
-export async function geoSearch(lat: number, lon: number, distance: string, page = 1, size = 10): Promise<SearchResult> {
-  const { data } = await api.get('/search/geo', { params: { lat, lon, distance, page, size } });
+export async function geoSearch(city: string, distance: string, page = 1, size = 10): Promise<SearchResult> {
+  const { data } = await api.get('/search/geo', { params: { city, distance, page, size } });
   return data;
 }

@@ -11,21 +11,27 @@ export default function SearchPage() {
   const [params, setParams] = useState<BasicSearchParams>({});
   const [boolQuery, setBoolQuery] = useState('');
   const [fulltextQ, setFulltextQ] = useState('');
-  const [geoLat, setGeoLat] = useState('');
-  const [geoLon, setGeoLon] = useState('');
+  const [geoCity, setGeoCity] = useState('');
   const [geoDistance, setGeoDistance] = useState('50km');
-  const [submitted, setSubmitted] = useState(false);
+
+  // Snapshot of inputs at the moment Search is clicked
+  const [searchKey, setSearchKey] = useState<object | null>(null);
 
   const { data, isFetching, error } = useQuery<SearchResult>({
-    queryKey: ['search', mode, params, boolQuery, fulltextQ, geoLat, geoLon, geoDistance],
+    queryKey: ['search', searchKey],
     queryFn: async () => {
       if (mode === 'basic') return basicSearch(params);
       if (mode === 'boolean') return booleanSearch({ query: boolQuery });
       if (mode === 'fulltext') return fulltextSearch(fulltextQ);
-      return geoSearch(Number(geoLat), Number(geoLon), geoDistance);
+      return geoSearch(geoCity, normalizeDistance(geoDistance));
     },
-    enabled: submitted,
+    enabled: searchKey !== null,
   });
+
+  function handleSearch() {
+    // Freeze current values as query key so typing doesn't re-trigger
+    setSearchKey({ mode, params, boolQuery, fulltextQ, geoCity, geoDistance, ts: Date.now() });
+  }
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -36,7 +42,7 @@ export default function SearchPage() {
         {(['basic', 'boolean', 'fulltext', 'geo'] as SearchMode[]).map((m) => (
           <button
             key={m}
-            onClick={() => { setMode(m); setSubmitted(false); }}
+            onClick={() => { setMode(m); setSearchKey(null); }}
             className={`px-3 py-1 rounded capitalize text-sm ${mode === m ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
           >
             {m}
@@ -90,24 +96,30 @@ export default function SearchPage() {
       )}
 
       {mode === 'geo' && (
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-2 gap-3 mb-4">
           <div>
-            <label className="block text-sm font-medium">Latitude</label>
-            <input className="border rounded px-2 py-1 w-full" value={geoLat} onChange={(e) => setGeoLat(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Longitude</label>
-            <input className="border rounded px-2 py-1 w-full" value={geoLon} onChange={(e) => setGeoLon(e.target.value)} />
+            <label className="block text-sm font-medium">City / Address</label>
+            <input
+              className="border rounded px-2 py-1 w-full"
+              placeholder="e.g. Novi Sad"
+              value={geoCity}
+              onChange={(e) => setGeoCity(e.target.value)}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium">Radius</label>
-            <input className="border rounded px-2 py-1 w-full" value={geoDistance} onChange={(e) => setGeoDistance(e.target.value)} />
+            <input
+              className="border rounded px-2 py-1 w-full"
+              placeholder="e.g. 50km"
+              value={geoDistance}
+              onChange={(e) => setGeoDistance(e.target.value)}
+            />
           </div>
         </div>
       )}
 
       <button
-        onClick={() => setSubmitted(true)}
+        onClick={handleSearch}
         className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700"
       >
         Search
@@ -128,4 +140,12 @@ export default function SearchPage() {
       </div>
     </div>
   );
+}
+
+/** Normalize distance: "50" → "50km", "50k" → "50km", "50km" → "50km" */
+function normalizeDistance(input: string): string {
+  const trimmed = input.trim();
+  if (/^\d+$/.test(trimmed)) return `${trimmed}km`;
+  if (/^\d+k$/i.test(trimmed)) return `${trimmed}m`;
+  return trimmed || '50km';
 }
