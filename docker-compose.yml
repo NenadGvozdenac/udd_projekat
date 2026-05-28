@@ -36,7 +36,7 @@ services:
     volumes:
       - ./backend:/app
       - /app/node_modules
-      - ./logs:/app/logs
+      - logs_data:/logs
     networks:
       - udd-net
 
@@ -95,9 +95,10 @@ services:
     volumes:
       - ./elk/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
       - ./elk/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
-      - ./logs:/logs:ro
+      - logs_data:/logs:ro
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     networks:
       - udd-net
 
@@ -108,14 +109,36 @@ services:
     ports:
       - '5601:5601'
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5601/api/status || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
     networks:
       - udd-net
+
+  kibana-setup:
+    image: python:3.11-alpine
+    volumes:
+      - ./elk/kibana/setup.sh:/setup.sh:ro
+    entrypoint: ["/bin/sh", "/setup.sh"]
+    environment:
+      - KIBANA_URL=http://kibana:5601
+    depends_on:
+      kibana:
+        condition: service_healthy
+    networks:
+      - udd-net
+    restart: "no"
 
 volumes:
   postgres_data:
   minio_data:
   es_data:
+  logs_data:
 
 networks:
   udd-net:

@@ -78,7 +78,17 @@ export async function indexDocument(req: AuthRequest, res: Response, next: NextF
       document: doc,
     });
 
-    logger.info(`Document indexed: ${result._id}`);
+    // Structured audit event — picked up by Logstash → Kibana
+    logger.info('document_indexed', {
+      event: 'document_indexed',
+      document_id: result._id,
+      forensic_analyst_name: forensicAnalystName || null,
+      organization_name: organizationName || null,
+      malware_name: malwareName || null,
+      threat_classification: threatClassification || null,
+      city: city || null,
+    });
+
     res.status(201).json({ id: result._id });
   } catch (err) {
     next(err);

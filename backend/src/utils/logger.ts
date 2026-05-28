@@ -1,7 +1,9 @@
 import winston from 'winston';
 import path from 'path';
+import fs from 'fs';
 
 const logDir = path.join(__dirname, '../../..', 'logs');
+fs.mkdirSync(logDir, { recursive: true });
 
 export const logger = winston.createLogger({
   level: 'info',
