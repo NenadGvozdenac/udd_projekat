@@ -1,0 +1,122 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+    depends_on:
+      - backend
+    networks:
+      - udd-net
+
+  backend:
+    build:
+      context: ./backend
+      target: dev
+    ports:
+      - '4000:4000'
+    env_file: ./backend/.env
+    environment:
+      - POSTGRES_HOST=postgres
+      - MINIO_ENDPOINT=minio
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      elasticsearch:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+      - ./logs:/app/logs
+    networks:
+      - udd-net
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: udd
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d udd"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - udd-net
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/data
+    networks:
+      - udd-net
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - '9200:9200'
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+    networks:
+      - udd-net
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    volumes:
+      - ./elk/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - ./elk/logstash/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logs:/logs:ro
+    depends_on:
+      - elasticsearch
+    networks:
+      - udd-net
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - '5601:5601'
+    depends_on:
+      - elasticsearch
+    networks:
+      - udd-net
+
+volumes:
+  postgres_data:
+  minio_data:
+  es_data:
+
+networks:
+  udd-net:
+    driver: bridge
