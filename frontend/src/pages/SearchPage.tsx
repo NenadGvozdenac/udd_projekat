@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { basicSearch, booleanSearch, fulltextSearch, geoSearch } from '../api/search';
+import { basicSearch, booleanSearch, fulltextSearch, geoSearch, knnSearch } from '../api/search';
 import SearchResultCard from '../components/search/SearchResultCard';
 import type { SearchResult, BasicSearchParams } from '../types';
 
-type SearchMode = 'basic' | 'boolean' | 'fulltext' | 'geo';
+type SearchMode = 'basic' | 'boolean' | 'fulltext' | 'geo' | 'knn';
 
 export default function SearchPage() {
   const [mode, setMode] = useState<SearchMode>('basic');
@@ -13,6 +13,8 @@ export default function SearchPage() {
   const [fulltextQ, setFulltextQ] = useState('');
   const [geoCity, setGeoCity] = useState('');
   const [geoDistance, setGeoDistance] = useState('50km');
+  const [knnQuery, setKnnQuery] = useState('');
+  const [knnK, setKnnK] = useState('10');
 
   // Snapshot of inputs at the moment Search is clicked
   const [searchKey, setSearchKey] = useState<object | null>(null);
@@ -23,6 +25,10 @@ export default function SearchPage() {
       if (mode === 'basic') return basicSearch(params);
       if (mode === 'boolean') return booleanSearch({ query: boolQuery });
       if (mode === 'fulltext') return fulltextSearch(fulltextQ);
+      if (mode === 'knn') {
+        if (!knnQuery.trim()) throw new Error('Query text is required');
+        return knnSearch(knnQuery, parseInt(knnK) || 10);
+      }
       return geoSearch(geoCity, normalizeDistance(geoDistance));
     },
     enabled: searchKey !== null,
@@ -30,7 +36,7 @@ export default function SearchPage() {
 
   function handleSearch() {
     // Freeze current values as query key so typing doesn't re-trigger
-    setSearchKey({ mode, params, boolQuery, fulltextQ, geoCity, geoDistance, ts: Date.now() });
+    setSearchKey({ mode, params, boolQuery, fulltextQ, geoCity, geoDistance, knnQuery, knnK, ts: Date.now() });
   }
 
   return (
@@ -39,7 +45,7 @@ export default function SearchPage() {
 
       {/* Mode tabs */}
       <div className="flex gap-2 mb-4">
-        {(['basic', 'boolean', 'fulltext', 'geo'] as SearchMode[]).map((m) => (
+        {(['basic', 'boolean', 'fulltext', 'geo', 'knn'] as SearchMode[]).map((m) => (
           <button
             key={m}
             onClick={() => { setMode(m); setSearchKey(null); }}
@@ -113,6 +119,31 @@ export default function SearchPage() {
               placeholder="e.g. 50km"
               value={geoDistance}
               onChange={(e) => setGeoDistance(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
+
+      {mode === 'knn' && (
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          <div className="col-span-2">
+            <label className="block text-sm font-medium mb-1">KNN Search (semantic similarity)</label>
+            <input
+              className="border rounded px-3 py-2 w-full"
+              placeholder="e.g. ransomware attack vector"
+              value={knnQuery}
+              onChange={(e) => setKnnQuery(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">K (number of results)</label>
+            <input
+              type="number"
+              className="border rounded px-2 py-1 w-full"
+              value={knnK}
+              onChange={(e) => setKnnK(e.target.value)}
+              min="1"
+              max="100"
             />
           </div>
         </div>

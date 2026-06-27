@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { esClient } from '../config/elasticsearch';
 import { parseBooleanQuery } from '../services/boolean-query.service';
 import { geocodeCity } from '../services/geocoding.service';
+import { generateEmbedding } from '../services/embedding.service';
 
 const INDEX = 'forensic_reports';
 const HIGHLIGHT_FIELDS = {
@@ -68,12 +69,15 @@ export async function fulltextSearch(req: AuthRequest, res: Response, next: Next
 
 export async function knnSearch(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { queryVector, k = 10 } = req.body;
+    const { query, k = 10 } = req.body;
 
-    if (!queryVector || !Array.isArray(queryVector)) {
-      res.status(400).json({ error: 'queryVector array is required' });
+    if (!query || typeof query !== 'string') {
+      res.status(400).json({ error: 'query string is required' });
       return;
     }
+
+    // Generate embedding from query text
+    const queryVector = await generateEmbedding(query);
 
     const result = await esClient.search({
       index: INDEX,

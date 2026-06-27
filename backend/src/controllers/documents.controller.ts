@@ -4,6 +4,7 @@ import { minioClient, MINIO_BUCKET, ensureBucketExists } from '../config/minio';
 import { esClient } from '../config/elasticsearch';
 import { parsePdf } from '../services/pdf-parser.service';
 import { geocodeCity } from '../services/geocoding.service';
+import { generateEmbedding } from '../services/embedding.service';
 import { logger } from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -59,6 +60,10 @@ export async function indexDocument(req: AuthRequest, res: Response, next: NextF
       }
     }
 
+    // Generate embedding from PDF content
+    logger.info('Generating embedding for KNN search...');
+    const pdfContentVector = await generateEmbedding(pdfContent || '');
+
     const doc = {
       forensic_analyst_name: forensicAnalystName,
       organization_name: organizationName,
@@ -67,6 +72,7 @@ export async function indexDocument(req: AuthRequest, res: Response, next: NextF
       threat_classification: threatClassification,
       sample_hash: sampleHash,
       pdf_content: pdfContent,
+      pdf_content_vector: pdfContentVector,
       city: city || null,
       location: resolvedLocation,
       minio_object_key: objectKey,

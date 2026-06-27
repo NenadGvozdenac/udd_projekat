@@ -11,8 +11,8 @@ export async function fulltextSearch(q: string, page = 1, size = 10): Promise<Se
   return data;
 }
 
-export async function knnSearch(queryVector: number[], k = 10): Promise<SearchResult> {
-  const { data } = await api.post('/search/knn', { queryVector, k });
+export async function knnSearch(query: string, k = 10): Promise<SearchResult> {
+  const { data } = await api.post('/search/knn', { query, k });
   return data;
 }
 
