@@ -113,3 +113,33 @@ export async function cancelIndexing(req: AuthRequest, res: Response, next: Next
     next(err);
   }
 }
+
+export async function downloadDocument(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { objectKey } = req.params;
+
+    if (!objectKey) {
+      res.status(400).json({ error: 'objectKey is required' });
+      return;
+    }
+
+    await ensureBucketExists();
+
+    // Get object from MinIO
+    const stream = await minioClient.getObject(MINIO_BUCKET, decodeURIComponent(objectKey));
+
+    // Set response headers for download
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${decodeURIComponent(objectKey)}"`);
+
+    // Pipe the stream to response
+    stream.pipe(res);
+
+    stream.on('error', (err) => {
+      logger.error(`Failed to download document: ${objectKey}`, { error: err.message });
+      res.status(404).json({ error: 'Document not found' });
+    });
+  } catch (err) {
+    next(err);
+  }
+}

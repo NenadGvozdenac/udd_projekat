@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { uploadAndParse, indexDocument, cancelIndexing } from '../controllers/documents.controller';
+import { uploadAndParse, indexDocument, cancelIndexing, downloadDocument } from '../controllers/documents.controller';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -19,5 +19,6 @@ const router = Router();
 router.post('/upload', upload.single('pdf'), uploadAndParse);
 router.post('/index', indexDocument);
 router.delete('/cancel/:objectKey', cancelIndexing);
+router.get('/download/:objectKey', downloadDocument);
 
 export default router;
